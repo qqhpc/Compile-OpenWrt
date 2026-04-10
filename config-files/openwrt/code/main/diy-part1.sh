@@ -1,25 +1,37 @@
 #!/bin/bash
 
-# 描述：OpenWrt DIY 脚本第 1 部分（更新 feed 之前）
+# 描述：OpenWrt DIY 脚本第 1 部分(更新 feed 之前)
 
-# passwall
-git clone https://github.com/xiaorouji/openwrt-passwall.git ./package/luci-app-passwall
-# helloworld
-sed -i "/helloworld/d" "feeds.conf.default" && git clone https://github.com/fw876/helloworld.git ./package/luci-app-ssr-plus
-# openclash
-git clone --branch master --depth=1 https://github.com/vernesong/OpenClash.git ./package/luci-app-openclash
-# homeproxy
-git clone https://github.com/immortalwrt/homeproxy.git ./package/luci-app-homeproxy
-# depends
-git clone https://github.com/xiaorouji/openwrt-passwall-packages.git ./package/passwall-depends
+# luci-app-passwall
+git clone -q --depth=1 --branch=main --single-branch https://github.com/Openwrt-Passwall/openwrt-passwall.git ./package/luci-app-passwall
 
+# luci-app-passwall2
+git clone -q --depth=1 --branch=main --single-branch https://github.com/Openwrt-Passwall/openwrt-passwall2.git ./package/luci-app-passwall2
 
-# Install vlmcsd
-git clone https://github.com/immortalwrt/packages.git ../packages
-git clone https://github.com/immortalwrt/luci.git ../luci
-cp -R ../packages/net/vlmcsd ./feeds/packages/net/vlmcsd
-cp -R ../luci/applications/luci-app-vlmcsd ./feeds/luci/applications/luci-app-vlmcsd
-rm -rf ../packages
-rm -rf ../luci
+# luci-app-ssr-plus
+sed -i "/helloworld/d" "feeds.conf.default" && git clone -q --depth=1 --branch=master --single-branch https://github.com/fw876/helloworld.git ./package/luci-app-ssr-plus
+
+# passwall-depends
+git clone -q --depth=1 --branch=main --single-branch https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git ./package/passwall-depends
+
+# luci-app-openclash
+git clone -q --depth=1 --branch=master --single-branch https://github.com/vernesong/OpenClash.git ./package/luci-app-openclash
+
+# luci-app-homeproxy
+git clone -q --depth=1 --branch=master --single-branch https://github.com/immortalwrt/homeproxy.git ./package/luci-app-homeproxy
+
+# 更新 go
+
+git clone -q --depth=1 --branch=master --single-branch https://github.com/openwrt/packages.git /tmp/packages
+rm -rf ./feeds/packages/lang/golang && cp -R /tmp/packages/lang/golang ./feeds/packages/lang/golang
+rm -rf /tmp/packages
+
+# luci-app-vlmcsd
+git clone -q --depth=1 --branch=master --single-branch https://github.com/immortalwrt/packages.git /tmp/immortalwrt-packages
+git clone -q --depth=1 --branch=master --single-branch https://github.com/immortalwrt/luci.git /tmp/immortalwrt-luci
+cp -R /tmp/immortalwrt-packages/net/vlmcsd ./feeds/packages/net/vlmcsd && cp -R /tmp/immortalwrt-luci/applications/luci-app-vlmcsd ./feeds/luci/applications/luci-app-vlmcsd
+rm -rf /tmp/immortalwrt-packages && rm -rf /tmp/immortalwrt-luci
+
+# 安装 feeds 因为又添加了 luci-app-vlmcsd
 ./scripts/feeds update -a
-./scripts/feeds install -a && ./scripts/feeds install -a -f
+./scripts/feeds install -a
