@@ -1,0 +1,111 @@
+#!/bin/sh
+
+# OpenWrt-25.12 fat
+#
+# lan 网段: 192.168.61.0/24
+# ------------------------------------------------------------------------------
+# 1. 系统与语言设置 (System & Language)
+# ------------------------------------------------------------------------------
+uci set system.@system[0].hostname='OpenWrt-Gateway'
+uci set system.@system[0].timezone='CST-8'
+uci set system.@system[0].zonename='Asia/Shanghai'
+uci set luci.main.lang='zh_cn'
+
+# 2. 让 ssh 只监听lan口
+uci set dropbear.@dropbear[0].Interface='lan'
+
+# 3. 设置 root 密码（明文方式，第一次启动后生效）   # 不推荐直接写明文密码，建议刷机后手动改
+uci set system.@system[0].password='88888888'
+
+# 4. 修改 LAN IP
+uci set network.lan.ipaddr='192.168.61.1'
+uci set network.lan.netmask='255.255.255.0'
+
+# 5. 在 WAN 区域启用 IPv6 伪装
+# 修正：通过查找 name='wan' 的区域来设置，而不是直接用 firewall.wan
+# 使用 uci 遍历查找 wan zone 的索引
+wan_zone_id=$(uci show firewall | grep ".name='wan'" | cut -d'.' -f2)
+if [ -n "$wan_zone_id" ]; then
+    uci set firewall.$wan_zone_id.masq6='1'
+else
+    # 备用方案：通常是 @zone[1]，如果上面没找到
+    uci set firewall.@zone[1].masq6='1'
+fi
+
+# 6. 禁用上游接口上的 IPv6 源过滤器
+uci set network.wan6.sourcefilter='0'
+
+# 7. 自定义 IPv6 ULA 前缀
+uci set network.globals.ula_prefix='fd92:168:61::/48'
+uci set network.globals.packet_steering='1'
+
+# 8. 本机 IPv6 后缀
+uci set network.lan.ip6ifaceid='::1'
+
+# 9. 关闭本地 IPv6 DNS 服务器
+uci set dhcp.lan.dns_service='0'
+uci set dhcp.lan.ra_default='2'
+
+# 10. 自定义 DHCP 下发的 DNS
+# 先删除可能存在的默认项,避免重复
+uci -q del dhcp.lan.ra_slaac
+# 确保 option 6 列表里没有重复项,先清空再添加,或者直接 add_list
+uci del_list dhcp.lan.dhcp_option='6,192.168.61.12' 2>/dev/null
+uci add_list dhcp.lan.dhcp_option='6,192.168.61.12'
+
+# 11. 配置固定 DHCP 租约
+add_lease() {
+    local name=$1
+    local mac=$2
+    local ip=$3
+    uci add dhcp host
+    uci set dhcp.@host[-1].name="$name"
+    uci set dhcp.@host[-1].mac="$mac"
+    uci set dhcp.@host[-1].ip="$ip"
+}
+
+add_lease 'm93p'         'D8:CB:8A:87:DB:80' '192.168.61.100'
+
+
+# 12. 将域名强制指向某个 IP 地址
+uci add_list dhcp.@dnsmasq[0].address='/nexus.yra.cc/192.168.61.30'
+
+# 13. 设置静态路由 (100.64.0.0/10 via 192.168.61.14)
+uci add network route
+uci set network.@route[-1].interface='lan'
+uci set network.@route[-1].target='100.64.0.0'
+uci set network.@route[-1].netmask='255.192.0.0'
+uci set network.@route[-1].gateway='192.168.61.14'
+
+# 14. 开启 https
+uci set uhttpd.main.redirect_https='1'
+
+
+# ------------------------------------------------------------------------------
+# 15. 服务配置 (Services: vlmcsd, vnstat, uhttpd)
+# ------------------------------------------------------------------------------
+
+# --- VLMCSD (KMS 服务器) ---
+# 确保启用并自动激活，删除 internet_access 限制（如果存在）
+uci set vlmcsd.config.enabled='1'
+uci set vlmcsd.config.auto_activate='1'
+uci -q del vlmcsd.config.internet_access
+
+# --- VnStat (流量监控) ---
+# 监听 br-lan 接口
+# 先删除可能存在的默认接口配置，确保干净
+uci -q delete vnstat.@vnstat[0]
+uci add vnstat vnstat
+uci add_list vnstat.@vnstat[-1].interface='br-lan'
+
+# --- uHTTPd (Web 管理) ---
+# 强制 HTTPS
+uci set uhttpd.main.redirect_https='1'
+
+# ==========================================
+# 五、提交所有修改
+# ==========================================
+uci commit
+
+# 确保最后退出码为0,表示执行成功
+exit 0

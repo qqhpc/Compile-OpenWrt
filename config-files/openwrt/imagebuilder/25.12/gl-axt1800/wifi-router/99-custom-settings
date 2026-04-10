@@ -1,0 +1,164 @@
+#!/bin/sh
+# ==========================================
+# 一、基本信息配置
+# ==========================================
+# 1. 设置主机名
+uci set system.@system[0].hostname='axt1800-wifi'
+
+# 2. 设置时区
+
+# 3. 让ssh只监听lan口
+uci set dropbear.@dropbear[0].Interface='lan'
+
+# 4. 设置 root 密码
+# echo -e "12345678\n12345678" | passwd root
+
+# 5. 修改 LAN IP
+uci set network.lan.ipaddr='192.168.238.253'
+uci set network.lan.netmask='255.255.255.0'
+
+# 6. 在 WAN 区域启用 IPv6 伪装 (通常 wan zone 名称为 wan,比索引 @zone[1] 更安全)
+# 修正：通过查找 name='wan' 的区域来设置，而不是直接用 firewall.wan
+# 使用 uci 遍历查找 wan zone 的索引
+wan_zone_id=$(uci show firewall | grep ".name='wan'" | cut -d'.' -f2)
+if [ -n "$wan_zone_id" ]; then
+    uci set firewall.$wan_zone_id.masq6='1'
+else
+    # 备用方案：通常是 @zone[1]，如果上面没找到
+    uci set firewall.@zone[1].masq6='1'
+fi
+
+# 7. 禁用上游接口上的 IPv6 源过滤器
+uci set network.wan6.sourcefilter='0'
+
+# 8. 自定义 IPv6 ULA 前缀
+uci set network.globals.ula_prefix='fd92:168:238::/48'
+
+# 9. 本机 IPv6 后缀
+uci set network.lan.ip6ifaceid='::253'
+
+# 10. 关闭本地 IPv6 DNS 服务器
+uci set dhcp.lan.dns_service='0'
+uci set dhcp.lan.ra_default='2'
+
+# 11. 自定义 DHCP 下发的 DNS
+# 先删除可能存在的默认项,避免重复
+uci -q del dhcp.lan.ra_slaac
+# 确保 option 6 列表里没有重复项,先清空再添加,或者直接 add_list
+uci del_list dhcp.lan.dhcp_option='6,192.168.60.12' 2>/dev/null
+uci add_list dhcp.lan.dhcp_option='6,192.168.60.12'
+
+# 12. 配置固定 DHCP 租约 (首次刷机无需清理旧租约,直接添加)
+
+# 13. 将域名强制指向某个 IP 地址
+
+
+# 14. 设置静态路由
+
+# 15. 开启 https
+uci set uhttpd.main.redirect_https='1'
+
+# =========================================
+#  二、wifi 配置
+# =========================================
+# 1. 确保无线配置文件已生成
+# 如果是首次启动，系统可能还在检测硬件，稍微等待一下
+if [ ! -f /etc/config/wireless ]; then
+    wifi config
+fi
+
+# ==========================================
+# 物理硬件配置 (Radio)
+# ==========================================
+
+# --- 5G Radio (radio0) ---
+# 开启硬件
+uci set wireless.radio0.disabled='0'
+# 设置国家代码 (非常重要，否则发射功率受限或无法启动)
+uci set wireless.radio0.country='US'
+# 固定信道 (强烈建议 36/40/44/48 或 149/153/157/161，避开 DFS 等待)
+uci set wireless.radio0.channel='36'
+# 强制开启 WiFi 6 (HE80)
+uci set wireless.radio0.htmode='HE80'
+# radio0 这个物理硬件应该工作在 5GHz 频段
+uci set wireless.radio0.band='5g'
+
+# --- 2.4G Radio (radio1) ---
+# 开启硬件
+uci set wireless.radio1.disabled='0'
+# 设置国家代码
+uci set wireless.radio1.country='US'
+# 固定信道 (1, 6, 11)
+uci set wireless.radio1.channel='6'
+# WiFi 6 2.4G (HE20 兼容性最好，干扰少；HE40 速度快但干扰大)
+uci set wireless.radio1.htmode='HE20'
+uci set wireless.radio1.band='2g'
+
+# ==========================================
+# 逻辑接口配置 (SSID/Interface)
+# ==========================================
+
+# --- 5G 接口 ---
+# 确保配置节点存在 (通常叫 default_radio0)
+if ! uci get wireless.default_radio0 >/dev/null 2>&1; then
+    uci set wireless.default_radio0=wifi-iface
+    uci set wireless.default_radio0.device='radio0'
+    uci set wireless.default_radio0.mode='ap'
+    uci set wireless.default_radio0.network='lan'
+fi
+
+uci set wireless.default_radio0.ssid='axt18005'
+uci set wireless.default_radio0.key='88888888p'
+# 如果确定固件包含了 wpad-openssl，可以使用 'sae' (WPA3)
+# 如果不确定，建议先用 'sae-mixed' (WPA2/WPA3 混合) 以防连不上
+uci set wireless.default_radio0.encryption='sae'
+uci set wireless.default_radio0.disabled='0'
+
+# --- 2.4G 接口 ---
+if ! uci get wireless.default_radio1 >/dev/null 2>&1; then
+    uci set wireless.default_radio1=wifi-iface
+    uci set wireless.default_radio1.device='radio1'
+    uci set wireless.default_radio1.mode='ap'
+    uci set wireless.default_radio1.network='lan'
+fi
+
+uci set wireless.default_radio1.ssid='axt180024'
+uci set wireless.default_radio1.key='88888888p'
+uci set wireless.default_radio1.encryption='sae'
+uci set wireless.default_radio1.disabled='0'
+
+# ==========================================
+# 三、高级配置 - VLAN
+# ==========================================
+
+# ==========================================
+# 四、高级配置 - 防火墙与安全隔离(这里是与vlan搭配的,不要单独废弃其中之一)
+# ==========================================
+
+# ==========================================
+# 五、单个软件包配置
+# ==========================================
+
+# 1. 配置 Watchcat 监控
+# 既然已经集成在固件里,直接修改第一组配置或添加新配置
+uci set watchcat.@watchcat[0].mode='restart_iface'
+uci set watchcat.@watchcat[0].period='10m'
+uci set watchcat.@watchcat[0].pinghosts='2400:3200::1'
+uci set watchcat.@watchcat[0].addressfamily='ipv6'
+uci set watchcat.@watchcat[0].pingperiod='2m'
+uci set watchcat.@watchcat[0].pingsize='standard'
+uci set watchcat.@watchcat[0].interface='@wan6'
+uci set watchcat.@watchcat[0].mmifacename='wan6'
+
+# 2. 配置 Vlmcsd KMS
+
+# 3. 配置 vnstat 流量统计
+uci add_list vnstat.@vnstat[0].interface='eth1'
+
+# ==========================================
+# 五、提交所有修改
+# ==========================================
+uci commit
+
+# 确保最后退出码为0,表示执行成功
+exit 0

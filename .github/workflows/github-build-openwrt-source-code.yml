@@ -1,0 +1,317 @@
+name: Github Build OpenWrt Source Code
+
+on:
+  workflow_dispatch:
+    inputs:
+
+      release_notes:
+        description: '此处输入 release 发行说明:'
+        default: '通过源码编译的 OpenWrt 固件'
+
+      source:
+        description: 'OpenWrt 的源码来源:'
+        required: true
+        default: 'openwrt'
+        type: choice
+        options:
+         - openwrt
+         - immortalwrt
+         - lede
+
+      version_number:
+        description: 'OpenWrt 的版本号:'
+        required: true
+        default: '25.12'
+        type: choice
+        options:
+         - main
+         - master
+         - 25.12
+
+      device:
+        description: '目标硬件?'
+        required: true
+        default: 'x86'
+        type: choice
+        options:
+          - x86
+          - gl-mt2500
+          - gl-axt1800
+          - nanopi-r2s
+          - photonicat-v1
+
+      purpose:
+        description: '固件的侧重用途?'
+        required: true
+        default: 'fat'
+        type: choice
+        options:
+          - fat               # 全功能版
+          - side-arm-gateway  # 单臂路由版
+          - gateway           # 网关
+          - wifi-router       # 普通 wifi 版
+          - ap                # AP 版
+
+permissions:
+  contents: write
+
+env:
+  TZ: Asia/Shanghai
+  CONFIG_FILE: config-files/${{ inputs.source }}/code/${{ inputs.version_number }}/${{ inputs.device }}/${{ inputs.purpose }}/config
+  DIY_P1_SH: config-files/${{ inputs.source }}/code/${{ inputs.version_number }}/diy-part1.sh
+  DIY_P2_SH: config-files/${{ inputs.source }}/code/${{ inputs.version_number }}/diy-part2.sh
+  FILES: config-files/${{ inputs.source }}/code/${{ inputs.version_number }}/${{ inputs.device }}/${{ inputs.purpose }}/files
+  # 将工作目录统一设为环境变量,方便管理
+  WORKDIR: /builder 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Checkout repository code
+        uses: actions/checkout@v6
+
+
+      - name: Check Server Performance
+        run: |
+          echo "警告⚠ 分配的服务器性能有限,若选择的插件过多,务必注意 CPU 性能!"
+          echo "--------------------------CPU信息--------------------------"
+          echo "CPU核心数量: $(nproc)"
+          echo "CPU型号信息: $(cat /proc/cpuinfo | grep -m1 name | awk -F: '{print $2}')"
+          echo "--------------------------内存与硬盘--------------------------"
+          free -h && echo "" && df -hT
+
+
+      - name: Firmware info
+        run: |
+          echo "源码版本: ${{ inputs.source }}-${{ inputs.version_number }}"
+          echo "目标设备: ${{ inputs.device }}"
+          echo "使用场景: ${{ inputs.purpose }}"
+
+
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: true
+          dotnet: true
+          docker-images: true
+          haskell: true
+          large-packages: true
+          swap-storage: false
+          tool-cache: false
+
+      - name: Initialization environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo -E apt-get -qq update
+          
+          case "${{ inputs.source }}" in
+            openwrt)
+              PKG_LIST="tools-list-for-openwrt" ;;
+            immortalwrt)
+              PKG_LIST="tools-list-for-immortalwrt" ;;
+            lede)
+              PKG_LIST="tools-list-for-lede" ;;
+            *)
+              echo "Unknown source code repository." && exit 1 ;;
+          esac
+          
+          cp -f config-files/${{ inputs.source }}/code/$PKG_LIST ${GITHUB_WORKSPACE}/package_list.txt
+          sudo -E apt-get -qq install $(cat package_list.txt)
+
+          echo "本次的 tools 是: $(cat package_list.txt)"
+
+          sudo -E systemctl daemon-reload
+          sudo -E apt-get -qq autoremove --purge && sudo -E apt-get -qq clean
+          sudo timedatectl set-timezone "$TZ"
+
+
+      - name: Prepare build directory
+        run: |
+          sudo mkdir -p ${{ env.WORKDIR }}
+          sudo chown -R runner:runner ${{ env.WORKDIR }}
+
+
+      - name: Clone source code
+        working-directory: ${{ env.WORKDIR }}
+        run: |
+          # 将 source 和 version_number 拼接起来进行判断
+          case "${{ inputs.source }}-${{ inputs.version_number }}" in
+            openwrt-main)
+              REPO_URL="https://github.com/openwrt/openwrt.git"; REPO_BRANCH="main" ;;
+            openwrt-25.12)
+              REPO_URL="https://github.com/openwrt/openwrt.git"; REPO_BRANCH="openwrt-25.12" ;;
+            
+            # 兼容 immortalwrt 用户选了 master 甚至选错成 main 的情况
+            immortalwrt-master | immortalwrt-main)
+              REPO_URL="https://github.com/immortalwrt/immortalwrt.git"; REPO_BRANCH="master" ;;
+            immortalwrt-25.12)
+              REPO_URL="https://github.com/immortalwrt/immortalwrt.git"; REPO_BRANCH="openwrt-25.12" ;;
+            
+            # lede 只有 master 分支,兼容用户选错成 main 的情况
+            lede-master | lede-main | lede-25.12)
+              REPO_URL="https://github.com/coolsnowwolf/lede.git"; REPO_BRANCH="master" ;;
+              
+            *)
+              echo "错误: 不支持的源码 (${{ inputs.source }}) 与版本 (${{ inputs.version_number }}) 组合！"
+              exit 1 ;;
+          esac
+
+          echo "克隆源码: $REPO_URL, 分支: $REPO_BRANCH"
+          git clone -q --single-branch --depth=1 --branch=${REPO_BRANCH} ${REPO_URL} openwrt
+          ln -sf ${{ env.WORKDIR }}/openwrt ${GITHUB_WORKSPACE}/openwrt
+
+
+      - name: Cache OpenWrt dl directory
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.WORKDIR }}/openwrt/dl
+          key: ${{ runner.os }}-dl-${{ inputs.source }}-${{ inputs.version_number }}-${{ inputs.device }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-dl-${{ inputs.source }}-${{ inputs.version_number }}-
+            ${{ runner.os }}-dl-${{ inputs.source }}-
+
+
+      - name: Cache OpenWrt ccache
+        uses: actions/cache@v5
+        with:
+          path: ${{ env.WORKDIR }}/openwrt/.ccache
+          # 末尾带 run_id 确保每次都能存入新缓存
+          key: ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.version_number }}-${{ inputs.device }}-${{ inputs.purpose }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.version_number }}-${{ inputs.device }}-${{ inputs.purpose }}-
+            ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.version_number }}-${{ inputs.device }}-
+
+
+
+      - name: Update and install feeds
+        run: |
+          cd openwrt
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+
+      - name: Clone custom software packages (DIY Part 1)
+        run: |
+          if [ -f "${GITHUB_WORKSPACE}/${DIY_P1_SH}" ]; then
+            chmod +x ${GITHUB_WORKSPACE}/${DIY_P1_SH}
+            cd openwrt
+            ${GITHUB_WORKSPACE}/${DIY_P1_SH}
+          fi
+
+
+      - name: Move config
+        run: |
+          [[ -e "${GITHUB_WORKSPACE}/${CONFIG_FILE}" ]] && cp -f ${GITHUB_WORKSPACE}/${CONFIG_FILE} openwrt/.config
+
+
+      - name: Move files
+        run: |
+          # 拷贝 files 目录
+          if [ -d "${GITHUB_WORKSPACE}/${FILES}" ]; then
+            cp -r ${GITHUB_WORKSPACE}/${FILES} openwrt/files
+            # 强制给所有 uci-defaults 下的脚本加上可执行权限
+            find openwrt/files/etc/uci-defaults -type f -exec chmod +x {} \; 2>/dev/null || true
+          fi
+
+
+      - name: Load custom configuration (DIY Part 2)
+        run: |
+          if [ -f "${GITHUB_WORKSPACE}/${DIY_P2_SH}" ]; then
+            chmod +x ${GITHUB_WORKSPACE}/${DIY_P2_SH}
+            cd openwrt
+            ${GITHUB_WORKSPACE}/${DIY_P2_SH}
+          fi
+
+
+      - name: Download dl packages
+        run: |
+          cd openwrt
+          make defconfig
+          make download -j8
+          find dl -size -1024c -exec ls -l {} \;
+          find dl -size -1024c -exec rm -f {} \;
+          make download -j1 || make download -j1 V=s
+
+
+      - name: Compile OpenWrt
+        run: |
+          echo "编译前剩余空间为:" && df -h
+          cd openwrt
+
+          # 设置 ccache 目录变量,限制缓存大小为 2G (防止挤爆 GitHub 10G 限制)
+          export CCACHE_DIR=$PWD/.ccache
+          ccache -M 2G 2>/dev/null || true
+          
+          make -j$(nproc) || make -j1 || make -j1 V=s
+
+          # 打印本次编译的 ccache 命中统计信息
+          echo "--------- ccache 命中统计 ---------"
+          ccache -s 2>/dev/null || ./staging_dir/host/bin/ccache -s 2>/dev/null || true
+          
+          grep '^CONFIG_device.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
+          [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
+          echo "FILE_DATE=_$(date +"%Y%m%d%H%M")" >> $GITHUB_ENV
+
+
+      - name: Convert img to qcow2
+        if: inputs.device == 'x86'
+        run: |
+          echo "img 转 qcow2"
+          cd openwrt/bin/targets/*/*/
+          # 采用安全匹配机制:即使某种格式的固件不存在,也不会引起通配符展开报错中断
+          shopt -s nullglob
+          for img in *efi.img; do
+            qemu-img convert -f raw -O qcow2 "$img" "op.efi.qcow2"
+          done
+          for img in *combined.img; do
+            qemu-img convert -f raw -O qcow2 "$img" "op.qcow2"
+          done
+
+
+      - name: Upload bin directory
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.source }}_${{ inputs.version_number }}_${{ inputs.device }}_${{ inputs.purpose }}_bin${{ env.FILE_DATE }}
+          path: openwrt/bin/
+          if-no-files-found: warn
+          compression-level: 6
+
+
+      - name: Organize files for release
+        run: |
+          cd openwrt/bin/targets/*/*
+          rm -rf packages
+          echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+          echo "release_tag=$(date +"%Y.%m.%d-%H%M")" >> $GITHUB_ENV
+
+
+      - name: Generate release notes
+        run: |
+          touch release_notes.txt
+          echo "${{ inputs.release_notes }}" >> release_notes.txt
+          echo "源码: ${{ inputs.source }}" >> release_notes.txt
+          echo "版本: ${{ inputs.version_number }}" >> release_notes.txt
+          echo "硬件: ${{ inputs.device }}" >> release_notes.txt
+          echo "用途: ${{ inputs.purpose }}" >> release_notes.txt
+
+
+      - name: Upload firmware to GitHub Release
+        uses: softprops/action-gh-release@v2.6.1
+        with:
+          tag_name: ${{ env.release_tag }}
+          body_path: release_notes.txt
+          files: ${{ env.FIRMWARE }}/*
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+          
+      # 若编译失败,仍然保留 ccache 内容(加快排错后的下次编译)
+      - name: Save OpenWrt ccache on failure
+        uses: actions/cache/save@v5
+        if: failure()
+        with:
+          path: ${{ env.WORKDIR }}/openwrt/.ccache
+          key: ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.version_number }}-${{ inputs.device }}-${{ inputs.purpose }}-${{ github.run_id }}

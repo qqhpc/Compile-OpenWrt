@@ -1,0 +1,22 @@
+luci-app-passwall luci-i18n-passwall-zh-cn 
+luci-app-passwall2 luci-i18n-passwall2-zh-cn
+luci-app-homeproxy luci-i18n-homeproxy-zh-cn 
+luci-app-openclash 
+luci-app-vlmcsd luci-i18n-vlmcsd-zh-cn 
+luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn luci-i18n-package-manager-zh-cn 
+dnsmasq-full block-mount luci-ssl kmod-nft-socket 
+luci-app-pbr luci-i18n-pbr-zh-cn 
+luci-app-keepalived luci-i18n-keepalived-zh-cn 
+ca-bundle 
+luci-app-acme luci-i18n-acme-zh-cn acme-acmesh-dnsapi 
+iperf3 
+luci-app-commands luci-i18n-commands-zh-cn luci-app-filemanager luci-i18n-filemanager-zh-cn luci-app-ttyd luci-i18n-ttyd-zh-cn wget-ssl curl 
+luci-app-statistics luci-i18n-statistics-zh-cn luci-app-nlbwmon luci-i18n-nlbwmon-zh-cn luci-app-vnstat2 luci-i18n-vnstat2-zh-cn 
+luci-app-watchcat luci-i18n-watchcat-zh-cn 
+prometheus-node-exporter-lua-openwrt prometheus-node-exporter-lua-nat_traffic prometheus-node-exporter-lua-netstat prometheus-node-exporter-lua-thermal prometheus-node-exporter-lua-hwmon prometheus-node-exporter-lua-wifi prometheus-node-exporter-lua-wifi_stations prometheus-node-exporter-lua-uci_dhcp_host 
+nano vim 
+tailscale 
+luci-app-cloudflared luci-i18n-cloudflared-zh-cn 
+luci-proto-wireguard wireguard-tools kmod-wireguard qrencode 
+luci-app-dockerman luci-i18n-dockerman-zh-cn docker docker-compose dockerd 
+-dnsmasq

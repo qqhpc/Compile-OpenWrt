@@ -1,0 +1,89 @@
+name: github actions 机器信息查看
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository code
+        uses: actions/checkout@v4
+
+      - name: 查看服务器信息
+        run: |
+          echo -e "已知CPU型号(降序): 7763，8370C，8272CL，8171M，E5-2673\n"
+          echo "--------------------------CPU信息--------------------------"
+          echo "CPU物理数量: $(cat /proc/cpuinfo | grep "physical id" | sort | uniq | wc -l)"
+          echo "CPU核心数量: $(nproc)"
+          echo -e "CPU型号信息:$(cat /proc/cpuinfo | grep -m1 name | awk -F: '{print $2}')\n"
+          echo "--------------------------内存信息--------------------------"
+          echo "已安装内存详细信息:"
+          echo -e "$(sudo lshw -short -C memory | grep GiB)\n"
+          echo "--------------------------硬盘信息--------------------------"
+          echo "硬盘数量: $(ls /dev/sd* | grep -v [1-9] | wc -l)" && df -hT
+
+                   
+      - name: 使用逻辑卷扩大 Github Actions 编译空间
+        run: |
+          echo "Github Actions 编译空间默认是 84G，除去系统和必要软件包外，可用空间在 50G 左右，当编译全部固件时会遇到空间不足的问题，可以使用逻辑卷扩大编译空间至 110G 左右。"
+          mnt_size=$(expr $(df -h /mnt | tail -1 | awk '{print $4}' | sed 's/[[:alpha:]]//g' | sed 's/\..*//') - 1)
+          root_size=$(expr $(df -h / | tail -1 | awk '{print $4}' | sed 's/[[:alpha:]]//g' | sed 's/\..*//') - 4)
+          sudo truncate -s "${mnt_size}"G /mnt/mnt.img
+          sudo truncate -s "${root_size}"G /root.img
+          sudo losetup /dev/loop6 /mnt/mnt.img
+          sudo losetup /dev/loop7 /root.img
+          sudo pvcreate /dev/loop6
+          sudo pvcreate /dev/loop7
+          sudo vgcreate github /dev/loop6 /dev/loop7
+          sudo lvcreate -n runner -l 100%FREE github
+          sudo mkfs.xfs /dev/github/runner
+          sudo mkdir -p /builder
+          sudo mount /dev/github/runner /builder
+          sudo chown -R runner.runner /builder
+          df -Th
+
+
+      - name: github 文件目录探查
+        id: space
+        run: |
+          echo "目录home下的文件是："
+          ls -alh /home
+
+          echo "目录home/runner下的文件是："
+          ls -alh /home/runner
+          
+          echo "目录home/runner/work下的文件是："
+          ls -alh /home/runner/work
+          
+          echo "目录home/runner/work/_actions下的文件是："
+          ls -alh /home/runner/work/_actions
+          
+          echo "目录home/runner/work/Actions-OpenWRT下的文件是："
+          ls -alh /home/runner/work/Actions-OpenWRT
+          
+          echo "目录home/runner/work/Actions-OpenWRT/Actions-OpenWRT下的文件是："
+          ls -alh /home/runner/work/Actions-OpenWRT/Actions-OpenWRT
+                    
+          echo "目录home/runner/work/_actions/actions下的文件是："
+          ls -alh /home/runner/work/_actions/actions   
+
+          echo "目录home/runner/work/_actions/actions/checkout下的文件是："
+          ls -lha /home/runner/work/_actions/actions/checkout
+
+          echo "目录builder下的文件是："
+          ls -lha /builder
+
+          echo "工作目录是："
+          echo ${GITHUB_WORKSPACE}
+
+      - name: github 硬盘大小查看
+        id: size
+        run: |
+          echo "硬盘大小是："
+          df -h
+
+          echo "builder的大小是："
+          df -h /builder
+         

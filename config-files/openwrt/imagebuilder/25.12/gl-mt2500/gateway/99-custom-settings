@@ -1,0 +1,213 @@
+#!/bin/sh
+# =================================================================
+# 设备型号: GL.iNet GL-MT2500 (Brume 2)
+# 系统版本: OpenWrt 24.10 (推荐)
+# 配置目标: 多VLAN隔离、安全加固、现代DSA规范、特定VLAN开启IPv6
+# 
+# VLAN 说明：
+# VLAN 1  (lan): 管理网，允许访问路由器后台 (Untagged on Port)
+# VLAN 20 (UNSAFE): 不安全设备内网 (IPv4 Only)
+# VLAN 30 (FM_WIFI): 父母的 wifi (IPv4 Only)
+# VLAN 40 (NVR): 监控网 (IPv4 Only)
+# VLAN 50 (IoT): 智能家居 (IPv4 Only)
+# VLAN 60 (SAFE): 安全内网，禁止管理路由器 (IPv4/IPv6)
+# =================================================================
+
+# --- 一、基础系统配置 ---
+uci set system.@system[0].hostname='TL-ER3220G'
+uci set system.@system[0].zonename='Asia/Shanghai'
+uci set system.@system[0].timezone='CST-8'
+
+# --- 二、物理网络设备定义 (DSA架构) ---
+# eth0 = 2.5G WAN, eth1 = 1G LAN
+uci set network.wan_dev=device
+uci set network.wan_dev.name='eth0'
+uci set network.wan_dev.type='ethernet'
+
+uci set network.lan_phys=device
+uci set network.lan_phys.name='eth1'
+uci set network.lan_phys.type='ethernet'
+
+# 创建网桥并开启 VLAN 过滤 (24.10 标准)
+uci delete network.lan_dev
+uci set network.lan_dev=device
+uci set network.lan_dev.name='br-lan'
+uci set network.lan_dev.type='bridge'
+uci set network.lan_dev.vlan_filtering='1'
+uci add_list network.lan_dev.ports='eth1'
+
+# --- 三、VLAN 划分 (Bridge VLAN - 24.10 规范) ---
+# 关键：不再将 br-lan 写入 ports 列表，由逻辑接口自动触发 CPU 权限
+while uci -q delete network.@bridge-vlan[0]; do :; done
+
+# VLAN 1: 管理网 (外部接入 eth1 的默认不带标签流量)
+uci add network bridge-vlan
+uci set network.@bridge-vlan[-1].device='br-lan'
+uci set network.@bridge-vlan[-1].vlan='1'
+uci set network.@bridge-vlan[-1].ports='eth1:u'
+
+# VLAN 20, 30, 40, 50, 60: 业务网 (外部接入 eth1 必须带对应标签)
+for vid in 20 30 40 50 60; do
+    uci add network bridge-vlan
+    uci set network.@bridge-vlan[-1].device='br-lan'
+    uci set network.@bridge-vlan[-1].vlan="$vid"
+    uci set network.@bridge-vlan[-1].ports='eth1:t'
+done
+
+# --- 四、三层逻辑接口配置 ---
+
+# 1. WAN 接口
+uci set network.wan=interface
+uci set network.wan.device='eth0'
+uci set network.wan.proto='dhcp'
+
+uci set network.wan6=interface
+uci set network.wan6.device='eth0'
+uci set network.wan6.proto='dhcpv6'
+uci set network.wan6.reqaddress='try'
+uci set network.wan6.reqprefix='auto'
+
+# 2. 全局 IPv6 前缀
+uci set network.globals.ula_prefix='fd92:168:253::/48'
+
+# 3. 逻辑接口定义
+# 注意：device 指定为 br-lan.vid，在 24.10 中会自动在 bridge self 开启该 VLAN
+setup_interface() {
+    local name="$1" vid="$2" ip="$3" v6="$4"
+    uci set network.$name=interface
+    uci set network.$name.proto='static'
+    uci set network.$name.device="br-lan.$vid"
+    uci set network.$name.ipaddr="$ip"
+    uci set network.$name.netmask='255.255.255.0'
+    if [ "$v6" -eq 1 ]; then
+        uci set network.$name.ip6assign='64'
+        uci set network.$name.ip6hint="$vid"
+    fi
+}
+
+setup_interface 'lan'            '1'  '192.168.253.253' 1  # 管理网
+setup_interface 'LAN_20_UNSAFE'  '20' '192.168.20.1'    0
+setup_interface 'LAN_30_FM_WIFI' '30' '192.168.30.1'    0
+setup_interface 'LAN_40_NVR'     '40' '192.168.40.1'    0
+setup_interface 'LAN_50_IoT'     '50' '192.168.50.1'    0
+setup_interface 'LAN_60_SAFE'    '60' '192.168.60.1'    1  # 安全网
+
+# --- 五、DHCP 服务配置 ---
+setup_dhcp() {
+    local name="$1" v6="$2"
+    uci -q delete dhcp.$name
+    uci set dhcp.$name=dhcp
+    uci set dhcp.$name.interface="$name"
+    uci set dhcp.$name.start='100'
+    uci set dhcp.$name.limit='150'
+    uci set dhcp.$name.leasetime='12h'
+    if [ "$v6" -eq 1 ]; then
+        uci set dhcp.$name.ra='server'
+        uci set dhcp.$name.dhcpv6='server'
+        uci set dhcp.$name.ra_management='1'
+    else
+        # 显式禁止该接口的 IPv6 通告
+        uci set dhcp.$name.ra='disabled'
+        uci set dhcp.$name.dhcpv6='disabled'
+    fi
+}
+
+setup_dhcp 'lan' 1
+setup_dhcp 'LAN_20_UNSAFE' 0
+setup_dhcp 'LAN_30_FM_WIFI' 0
+setup_dhcp 'LAN_40_NVR' 0
+setup_dhcp 'LAN_50_IoT' 0
+setup_dhcp 'LAN_60_SAFE' 1
+
+# --- 六、防火墙安全策略 (隔离与 IPv6 开孔) ---
+
+# 开启硬件转发加速
+uci set firewall.@defaults[0].flow_offloading='1'
+uci set firewall.@defaults[0].flow_offloading_hw='1'
+
+# 1. VLAN 1 (lan) - 管理区域：允许 Input (访问路由器)
+uci set firewall.@zone[0].name='lan'
+uci set firewall.@zone[0].network='lan'
+uci set firewall.@zone[0].input='ACCEPT'
+uci set firewall.@zone[0].forward='REJECT'
+uci set firewall.@zone[0].output='ACCEPT'
+
+# 2. 统一业务 Zone 处理函数
+setup_firewall_zone() {
+    local zname="$1" iname="$2" v6="$3"
+    uci add firewall zone
+    uci set firewall.@zone[-1].name="$zname"
+    uci set firewall.@zone[-1].network="$iname"
+    uci set firewall.@zone[-1].input='REJECT'   # 核心隔离：禁止访问路由器
+    uci set firewall.@zone[-1].forward='REJECT' # 禁止跨 VLAN 互访
+    uci set firewall.@zone[-1].output='ACCEPT'
+    
+    # 强制该区域仅限 IPv4 (如果 v6=0)
+    [ "$v6" -eq 0 ] && uci set firewall.@zone[-1].family='ipv4'
+
+    # 允许上网 (Forward to WAN)
+    uci add firewall forwarding
+    uci set firewall.@forwarding[-1].src="$zname"
+    uci set firewall.@forwarding[-1].dest='wan'
+
+    # 允许基础服务：DNS (UDP 53) 和 DHCP (UDP 67)
+    for port in 53 67; do
+        uci add firewall rule
+        uci set firewall.@rule[-1].name="Allow_${port}_${zname}"
+        uci set firewall.@rule[-1].src="$zname"
+        uci set firewall.@rule[-1].dest_port="$port"
+        uci set firewall.@rule[-1].proto='udp'
+        uci set firewall.@rule[-1].target='ACCEPT'
+    done
+
+    # IPv6 必须的邻居发现协议 (NDP) 开孔
+    if [ "$v6" -eq 1 ]; then
+        uci add firewall rule
+        uci set firewall.@rule[-1].name="Allow_ICMPv6_${zname}"
+        uci set firewall.@rule[-1].src="$zname"
+        uci set firewall.@rule[-1].proto='icmp'
+        uci add_list firewall.@rule[-1].icmp_type='echo-request'
+        uci add_list firewall.@rule[-1].icmp_type='neighbour-solicitation'
+        uci add_list firewall.@rule[-1].icmp_type='neighbour-advertisement'
+        uci add_list firewall.@rule[-1].icmp_type='router-solicitation'
+        uci add_list firewall.@rule[-1].icmp_type='router-advertisement'
+        uci set firewall.@rule[-1].family='ipv6'
+        uci set firewall.@rule[-1].target='ACCEPT'
+    fi
+}
+
+setup_firewall_zone 'zone_vlan20' 'LAN_20_UNSAFE'  0
+setup_firewall_zone 'zone_vlan30' 'LAN_30_FM_WIFI' 0
+setup_firewall_zone 'zone_vlan40' 'LAN_40_NVR'     0
+setup_firewall_zone 'zone_vlan50' 'LAN_50_IoT'     0
+setup_firewall_zone 'zone_vlan60' 'LAN_60_SAFE'    1
+
+# --- 七、其他安全与监控配置 ---
+
+# 1. SSH 仅允许从管理网 (VLAN 1) 访问
+uci set dropbear.@dropbear[0].Interface='lan'
+
+# 2. Watchcat 监控 IPv6 (应对光猫前缀变化)
+uci set watchcat.@watchcat[0].mode='restart_iface'
+uci set watchcat.@watchcat[0].period='10m'
+uci set watchcat.@watchcat[0].pinghosts='2400:3200::1'
+uci set watchcat.@watchcat[0].addressfamily='ipv6'
+uci set watchcat.@watchcat[0].interface='wan6'
+uci set watchcat.@watchcat[0].mmifacename='wan6'
+
+# 3. 流量统计
+uci -q delete vnstat.@vnstat[0].interface
+uci add_list vnstat.@vnstat[0].interface='eth0'
+uci add_list vnstat.@vnstat[0].interface='eth1'
+
+# --- 八、提交并保存 ---
+uci commit network
+uci commit dhcp
+uci commit firewall
+uci commit system
+uci commit dropbear
+uci commit watchcat
+uci commit vnstat
+uci commit
+
+exit 0
