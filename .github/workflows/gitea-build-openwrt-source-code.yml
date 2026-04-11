@@ -205,15 +205,17 @@ jobs:
             ${GITHUB_WORKSPACE}/${DIY_P1_SH}
           fi
 
-          echo '查看结果:'
-          cd openwrt || true && pwd && ls -lha ./package || true
+          echo '本地目录:'
+          pwd
+          echo '插件'
+          ls -lha ./package || true 
 
 
       - name: Move config
         run: |
           [[ -e "${GITHUB_WORKSPACE}/${CONFIG_FILE}" ]] && cp -f ${GITHUB_WORKSPACE}/${CONFIG_FILE} openwrt/.config
 
-          echo '查看 config'
+          echo '显示现在的目录,查看config的原目录情况,查看目的目录是否有config'
           pwd && ls -lha "${GITHUB_WORKSPACE}/${CONFIG_FILE}"  || true && ls -lha openwrt/.config || true
 
 
