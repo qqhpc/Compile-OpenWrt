@@ -207,7 +207,9 @@ jobs:
 
           echo '本地目录:'
           pwd
-          echo '插件'
+          echo '本地目录有哪些文件?'
+          ls -lh
+          echo '插件下载好了吗?'
           ls -lha ./package || true 
 
 
