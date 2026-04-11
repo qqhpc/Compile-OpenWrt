@@ -250,7 +250,7 @@ jobs:
         run: |
           cd openwrt
           make defconfig
-          make download -j2
+          make download -j1 && make download -j1  V=s
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
           make download -j1 || make download -j1 V=s
