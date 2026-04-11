@@ -66,7 +66,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
 
@@ -95,6 +95,15 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
+
+          # 使用本地的 nexus3 的 apt 代理 , Ubuntu 24.04 (noble)
+          cat <<EOF | sudo tee /etc/apt/sources.list
+          deb https://nexus.yra.cc/repository/ubuntu-noble-proxy/ noble main restricted universe multiverse
+          deb https://nexus.yra.cc/repository/ubuntu-noble-proxy/ noble-updates main restricted universe multiverse
+          deb https://nexus.yra.cc/repository/ubuntu-noble-proxy/ noble-backports main restricted universe multiverse
+          deb https://nexus.yra.cc/repository/ubuntu-noble-security-proxy/ noble-security main restricted universe multiverse
+          EOF
+
           sudo -E apt-get -qq update
           
           case "${{ inputs.source }}" in
