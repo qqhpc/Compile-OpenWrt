@@ -205,6 +205,9 @@ jobs:
             ${GITHUB_WORKSPACE}/${DIY_P1_SH}
           fi
 
+          echo '查看结果:'
+          cd openwrt && pwd && ls -lha ./package
+
 
       - name: Move config
         run: |
