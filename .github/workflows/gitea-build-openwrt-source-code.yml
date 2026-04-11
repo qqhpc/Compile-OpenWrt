@@ -120,7 +120,14 @@ jobs:
       - name: Prepare build directory
         run: |
           sudo mkdir -p ${{ env.WORKDIR }}
-          sudo chown -R runner:runner ${{ env.WORKDIR }}
+
+          # 在 Gitea Docker 容器中，直接给 root 权限即可（最稳妥）
+          # 或者使用当前实际用户（通常是 root）
+          sudo chown -R $(id -u):$(id -g) ${{ env.WORKDIR }}
+    
+          # 可选：打印当前用户和权限，便于后续调试
+          echo "当前用户: $(whoami)  UID:$(id -u)  GID:$(id -g)"
+          ls -ld ${{ env.WORKDIR }}
 
 
       - name: Clone source code
