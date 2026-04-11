@@ -46,11 +46,11 @@ on:
         default: 'side-arm-gateway'
         type: choice
         options:
-          - fat               # 全功能版
-          - side-arm-gateway  # 单臂路由版
-          - gateway           # 网关
-          - wifi-router       # 普通 wifi 版
-          - ap                # AP 版
+          - fat
+          - side-arm-gateway
+          - gateway
+          - wifi-router
+          - ap
 
 permissions:
   contents: write
