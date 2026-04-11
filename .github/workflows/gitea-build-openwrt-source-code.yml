@@ -213,6 +213,9 @@ jobs:
         run: |
           [[ -e "${GITHUB_WORKSPACE}/${CONFIG_FILE}" ]] && cp -f ${GITHUB_WORKSPACE}/${CONFIG_FILE} openwrt/.config
 
+          echo '查看 config'
+          pwd && ls -lha "${GITHUB_WORKSPACE}/${CONFIG_FILE}" && ls -lha openwrt/.config
+
 
       - name: Move files
         run: |
