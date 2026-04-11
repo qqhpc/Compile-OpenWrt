@@ -296,6 +296,15 @@ jobs:
           done
 
 
+      - name: Upload bin directory
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ inputs.source }}_${{ inputs.version_number }}_${{ inputs.device }}_${{ inputs.purpose }}_bin${{ env.FILE_DATE }}
+          path: openwrt/bin/
+          if-no-files-found: warn
+          compression-level: 6
+
+
       - name: Organize files for release
         run: |
           cd openwrt/bin/targets/*/*
