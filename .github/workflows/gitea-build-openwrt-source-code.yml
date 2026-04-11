@@ -226,6 +226,9 @@ jobs:
             find openwrt/files/etc/uci-defaults -type f -exec chmod +x {} \; 2>/dev/null || true
           fi
 
+          echo '查看 files'
+          ls -lhaR openwrt/files
+
 
       - name: Load custom configuration (DIY Part 2)
         run: |
@@ -234,6 +237,9 @@ jobs:
             cd openwrt
             ${GITHUB_WORKSPACE}/${DIY_P2_SH}
           fi
+
+          echo '脚本存在吗?'
+          ls -lha "${GITHUB_WORKSPACE}/${DIY_P2_SH}"
 
 
       - name: Download dl packages
