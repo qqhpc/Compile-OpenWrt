@@ -220,7 +220,7 @@ jobs:
         run: |
           cd openwrt
           make defconfig
-          make download -j8
+          make download -j2
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
           make download -j1 || make download -j1 V=s
@@ -231,9 +231,9 @@ jobs:
           echo "编译前剩余空间为:" && df -h
           cd openwrt
 
-          # 设置 ccache 目录变量,限制缓存大小为 2G (防止挤爆 GitHub 10G 限制)
+          # 设置 ccache 目录变量,限制缓存大小为 10G
           export CCACHE_DIR=$PWD/.ccache
-          ccache -M 2G 2>/dev/null || true
+          ccache -M 10G 2>/dev/null || true
           
           make -j$(nproc) || make -j1 || make -j1 V=s
 
@@ -292,8 +292,8 @@ jobs:
         run: |
           # 1. 设置变量
           # Gitea Actions 会自动提供 GITHUB_SERVER_URL (如 http://your-gitea.com) 和 GITHUB_REPOSITORY (如 user/repo)
-          API_URL="${GITHUB_SERVER_URL}/api/v1/repos/${GITHUB_REPOSITORY}/releases"
-          AUTH_HEADER="Authorization: token ${{ secrets.GITHUB_TOKEN }}"
+          API_URL="${GITEA_SERVER_URL}/api/v1/repos/${GITEA_REPOSITORY}/releases"
+          AUTH_HEADER="Authorization: token ${{ secrets.GITEA_TOKEN }}"
           
           # 读取发布说明并转义为 JSON 字符串，防止特殊字符导致 curl 失败
           RELEASE_BODY=$(cat release_notes.txt)
