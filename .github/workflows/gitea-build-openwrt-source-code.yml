@@ -43,7 +43,7 @@ on:
       purpose:
         description: '固件的侧重用途?'
         required: true
-        default: 'fat'
+        default: 'side-arm-gateway'
         type: choice
         options:
           - fat               # 全功能版
@@ -294,15 +294,6 @@ jobs:
           for img in *combined.img; do
             qemu-img convert -f raw -O qcow2 "$img" "op.qcow2"
           done
-
-
-      # - name: Upload bin directory
-        # uses: actions/upload-artifact@v7
-        # with:
-          # name: ${{ inputs.source }}_${{ inputs.version_number }}_${{ inputs.device }}_${{ inputs.purpose }}_bin${{ env.FILE_DATE }}
-          # path: openwrt/bin/
-          # if-no-files-found: warn
-          # compression-level: 6
 
 
       - name: Organize files for release
