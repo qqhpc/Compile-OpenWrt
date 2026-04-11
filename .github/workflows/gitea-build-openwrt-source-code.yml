@@ -14,9 +14,9 @@ on:
         default: 'openwrt'
         type: choice
         options:
-         - 'openwrt'
-         - 'immortalwrt'
-         - 'lede'
+         - openwrt
+         - immortalwrt
+         - lede
 
       version_number:
         description: 'OpenWrt 的版本号:'
@@ -24,9 +24,9 @@ on:
         default: '25.12'
         type: choice
         options:
-         - 'main'
-         - 'master'
-         - '25.12'
+         - main
+         - master
+         - 25.12
 
       device:
         description: '目标硬件?'
@@ -34,11 +34,11 @@ on:
         default: 'x86'
         type: choice
         options:
-          - 'x86'
-          - 'gl-mt2500'
-          - 'gl-axt1800'
-          - 'nanopi-r2s'
-          - 'photonicat-v1'
+          - x86
+          - gl-mt2500
+          - gl-axt1800
+          - nanopi-r2s
+          - photonicat-v1
 
       purpose:
         description: '固件的侧重用途?'
@@ -46,11 +46,11 @@ on:
         default: 'fat'
         type: choice
         options:
-          - 'fat'
-          - 'side-arm-gateway'
-          - 'gateway'
-          - 'wifi-router'
-          - 'ap'
+          - fat               # 全功能版
+          - side-arm-gateway  # 单臂路由版
+          - gateway           # 网关
+          - wifi-router       # 普通 wifi 版
+          - ap                # AP 版
 
 permissions:
   contents: write
@@ -131,7 +131,7 @@ jobs:
           sudo mkdir -p ${{ env.WORKDIR }}
 
           # 在 Gitea Docker 容器中，直接给 root 权限即可（最稳妥）
-          # 或者使用当前实际用户（通常是 root)
+          # 或者使用当前实际用户（通常是 root）
           sudo chown -R $(id -u):$(id -g) ${{ env.WORKDIR }}
     
           # 可选：打印当前用户和权限，便于后续调试
@@ -206,19 +206,10 @@ jobs:
             ${GITHUB_WORKSPACE}/${DIY_P1_SH}
           fi
 
-          echo "查看结果:"
-          cd openwrt && pwd
-          ls -lha ./package
-
 
       - name: Move config
         run: |
           [[ -e "${GITHUB_WORKSPACE}/${CONFIG_FILE}" ]] && cp -f ${GITHUB_WORKSPACE}/${CONFIG_FILE} openwrt/.config
-
-          echo "源目录有config吗?"
-          pwd && ls -lha "${GITHUB_WORKSPACE}/${CONFIG_FILE}"
-          echo "config 被移到目标目录了吗?"
-          ls -lha openwrt/.config
 
 
       - name: Move files
@@ -230,11 +221,6 @@ jobs:
             find openwrt/files/etc/uci-defaults -type f -exec chmod +x {} \; 2>/dev/null || true
           fi
 
-          echo "源目录有 files 吗?"
-          ls -lhaR "${GITHUB_WORKSPACE}/${FILES}"
-          echo "files 被移到目标目录了吗?"
-          ls -lhaR openwrt/files
-
 
       - name: Load custom configuration (DIY Part 2)
         run: |
@@ -243,9 +229,6 @@ jobs:
             cd openwrt
             ${GITHUB_WORKSPACE}/${DIY_P2_SH}
           fi
-
-          echo "脚本存在吗?"
-          ls -lha "${GITHUB_WORKSPACE}/${DIY_P2_SH}"
 
 
       - name: Download dl packages
@@ -266,10 +249,7 @@ jobs:
           # 设置 ccache 目录变量,限制缓存大小为 10G
           export CCACHE_DIR=$PWD/.ccache
           ccache -M 10G 2>/dev/null || true
-
-          # 允许以 root 运行 configure
-          export FORCE_UNSAFE_CONFIGURE=1
-
+          
           make -j$(nproc) || make -j1 || make -j1 V=s
 
           # 打印本次编译的 ccache 命中统计信息
