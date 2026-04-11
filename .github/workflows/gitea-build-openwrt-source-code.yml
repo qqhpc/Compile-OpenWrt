@@ -206,7 +206,7 @@ jobs:
           fi
 
           echo '查看结果:'
-          cd openwrt && pwd && ls -lha ./package
+          cd openwrt || true && pwd && ls -lha ./package || true
 
 
       - name: Move config
@@ -214,7 +214,7 @@ jobs:
           [[ -e "${GITHUB_WORKSPACE}/${CONFIG_FILE}" ]] && cp -f ${GITHUB_WORKSPACE}/${CONFIG_FILE} openwrt/.config
 
           echo '查看 config'
-          pwd && ls -lha "${GITHUB_WORKSPACE}/${CONFIG_FILE}" && ls -lha openwrt/.config
+          pwd && ls -lha "${GITHUB_WORKSPACE}/${CONFIG_FILE}"  || true && ls -lha openwrt/.config || true
 
 
       - name: Move files
@@ -227,7 +227,7 @@ jobs:
           fi
 
           echo '查看 files'
-          ls -lhaR openwrt/files
+          ls -lhaR openwrt/files || true
 
 
       - name: Load custom configuration (DIY Part 2)
@@ -239,7 +239,7 @@ jobs:
           fi
 
           echo '脚本存在吗?'
-          ls -lha "${GITHUB_WORKSPACE}/${DIY_P2_SH}"
+          ls -lha "${GITHUB_WORKSPACE}/${DIY_P2_SH}" || true
 
 
       - name: Download dl packages
