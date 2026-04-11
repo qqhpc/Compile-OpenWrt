@@ -14,9 +14,9 @@ on:
         default: 'openwrt'
         type: choice
         options:
-         - openwrt
-         - immortalwrt
-         - lede
+         - 'openwrt'
+         - 'immortalwrt'
+         - 'lede'
 
       version_number:
         description: 'OpenWrt 的版本号:'
@@ -24,9 +24,9 @@ on:
         default: '25.12'
         type: choice
         options:
-         - main
-         - master
-         - 25.12
+         - 'main'
+         - 'master'
+         - '25.12'
 
       device:
         description: '目标硬件?'
@@ -34,11 +34,11 @@ on:
         default: 'x86'
         type: choice
         options:
-          - x86
-          - gl-mt2500
-          - gl-axt1800
-          - nanopi-r2s
-          - photonicat-v1
+          - 'x86'
+          - 'gl-mt2500'
+          - 'gl-axt1800'
+          - 'nanopi-r2s'
+          - 'photonicat-v1'
 
       purpose:
         description: '固件的侧重用途?'
@@ -46,11 +46,11 @@ on:
         default: 'side-arm-gateway'
         type: choice
         options:
-          - fat
-          - side-arm-gateway
-          - gateway
-          - wifi-router
-          - ap
+          - 'fat'
+          - 'side-arm-gateway'
+          - 'gateway'
+          - 'wifi-router'
+          - 'ap'
 
 permissions:
   contents: write
