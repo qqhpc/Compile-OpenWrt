@@ -113,9 +113,8 @@ jobs:
 
           echo "本次的 tools 是: $(cat package_list.txt)"
 
-          sudo -E systemctl daemon-reload
           sudo -E apt-get -qq autoremove --purge && sudo -E apt-get -qq clean
-          sudo timedatectl set-timezone "$TZ"
+          sudo timedatectl set-timezone "$TZ" || true
 
 
       - name: Prepare build directory
