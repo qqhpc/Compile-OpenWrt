@@ -172,9 +172,9 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.WORKDIR }}/openwrt/dl
-          key: ${{ runner.os }}-dl-${{ inputs.source }}-${{ inputs.version_number }}-${{ inputs.device }}-${{ github.run_id }}
+          key: ${{ runner.os }}-dl-${{ inputs.source }}-${{ inputs.device }}-${{ inputs.version_number }}-${{ github.run_id }}
           restore-keys: |
-            ${{ runner.os }}-dl-${{ inputs.source }}-${{ inputs.version_number }}-
+            ${{ runner.os }}-dl-${{ inputs.source }}-${{ inputs.device }}-${{ inputs.version_number }}-
             ${{ runner.os }}-dl-${{ inputs.source }}-
 
 
@@ -183,10 +183,10 @@ jobs:
         with:
           path: ${{ env.WORKDIR }}/openwrt/.ccache
           # 末尾带 run_id 确保每次都能存入新缓存
-          key: ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.version_number }}-${{ inputs.device }}-${{ inputs.purpose }}-${{ github.run_id }}
+          key: ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.device }}-${{ inputs.version_number }}-${{ inputs.purpose }}-${{ github.run_id }}
           restore-keys: |
-            ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.version_number }}-${{ inputs.device }}-${{ inputs.purpose }}-
-            ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.version_number }}-${{ inputs.device }}-
+            ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.device }}-${{ inputs.version_number }}-${{ inputs.purpose }}-
+            ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.device }}-${{ inputs.version_number }}-
 
 
 
@@ -371,4 +371,4 @@ jobs:
         if: failure()
         with:
           path: ${{ env.WORKDIR }}/openwrt/.ccache
-          key: ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.version_number }}-${{ inputs.device }}-${{ inputs.purpose }}-${{ github.run_id }}
+          key: ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.device }}-${{ inputs.version_number }}-${{ inputs.purpose }}-${{ github.run_id }}
