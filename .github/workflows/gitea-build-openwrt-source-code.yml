@@ -103,6 +103,16 @@ jobs:
           deb https://nexus.yra.cc/repository/ubuntu-noble-security-proxy/ noble-security main restricted universe multiverse
           EOF
 
+          echo '检查自定义软件源的结果:'
+          echo '/etc/apt/sources.list里的内容:'
+          cat /etc/apt/sources.list || true
+
+          echo '软件源是DEB822 格式吗?'
+          ls -lhR /etc/apt/sources.list.d/ || true
+
+          echo '如果软件源是DEB822 格式,尝试展示内容:'
+          cat /etc/apt/sources.list.d/ubuntu.sources || true
+
           sudo -E apt-get -qq update
           
           case "${{ inputs.source }}" in
