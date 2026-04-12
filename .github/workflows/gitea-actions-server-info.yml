@@ -30,3 +30,7 @@ jobs:
 
           echo '如果软件源是DEB822 格式,尝试展示内容:'
           cat /etc/apt/sources.list.d/ubuntu.sources || true
+
+
+          ping git.openwrt.org  -c 4
+
