@@ -13,13 +13,7 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          # 使用本地的 nexus3 的 apt 代理 , Ubuntu 24.04 (noble)
-          cat <<EOF | sudo tee /etc/apt/sources.list
-          deb https://nexus.yra.cc/repository/ubuntu-noble-proxy/ noble main restricted universe multiverse
-          deb https://nexus.yra.cc/repository/ubuntu-noble-proxy/ noble-updates main restricted universe multiverse
-          deb https://nexus.yra.cc/repository/ubuntu-noble-proxy/ noble-backports main restricted universe multiverse
-          deb https://nexus.yra.cc/repository/ubuntu-noble-security-proxy/ noble-security main restricted universe multiverse
-          EOF
+          sudo sed -i 's|http://archive.ubuntu.com/ubuntu/|https://nexus.yra.cc/repository/ubuntu-noble-proxy|; s|http://security.ubuntu.com/ubuntu/|https://nexus.yra.cc/repository/ubuntu-noble-security-proxy|' /etc/apt/sources.list.d/ubuntu.sources
 
           echo '检查自定义软件源的结果:'
           echo '/etc/apt/sources.list里的内容:'
@@ -32,5 +26,5 @@ jobs:
           cat /etc/apt/sources.list.d/ubuntu.sources || true
 
 
-          ping git.openwrt.org  -c 4
+          curl git.openwrt.org || true
 
