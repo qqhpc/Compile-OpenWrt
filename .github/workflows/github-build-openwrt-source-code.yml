@@ -246,7 +246,7 @@ jobs:
           export CCACHE_DIR=$PWD/.ccache
           ccache -M 2G 2>/dev/null || true
           
-          make -j$(nproc) || make -j1 || make -j1 V=s
+          make -j$(nproc) || (make -j1) || (make clean && make -j1 V=s)
 
           # 打印本次编译的 ccache 命中统计信息
           echo "--------- ccache 命中统计 ---------"
