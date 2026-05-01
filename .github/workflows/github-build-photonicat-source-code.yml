@@ -229,6 +229,8 @@ jobs:
       - name: Download dl packages
         run: |
           cd openwrt
+          # 修复 v2ray-geodata 下载错误
+          rm feeds/packages/net/v2ray-geodata/Makefile && wget https://raw.githubusercontent.com/qqhpc/Compile-OpenWrt/refs/heads/main/config-files/photonicat/code/master/photonicat-v1/wifi-router/v2ray-geodata-Makefile && mv v2ray-geodata-Makefile feeds/packages/net/v2ray-geodata/Makefile && cat feeds/packages/net/v2ray-geodata/Makefile
           make defconfig
           make download -j8
           find dl -size -1024c -exec ls -l {} \;
