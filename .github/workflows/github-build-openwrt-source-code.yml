@@ -231,7 +231,9 @@ jobs:
         run: |
           cd openwrt
           make defconfig
-          make download -j8
+          # 删除旧的 Go 依赖缓存，强制重新拉取
+          rm -rf dl/go-mod-cache/
+          make download -j4
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
           make download -j1 || make download -j1 V=s
