@@ -9,7 +9,7 @@ git clone -q --depth=1 --branch=main --single-branch https://github.com/qqhpc/op
 git clone -q --depth=1 --branch=main --single-branch https://github.com/qqhpc/openwrt-passwall2.git ./package/luci-app-passwall2
 
 # luci-app-ssr-plus
-sed -i "/helloworld/d" "feeds.conf.default" && git clone -q --depth=1 --branch=master --single-branch https://github.com/qqhpc/helloworld.git ./package/luci-app-ssr-plus
+# sed -i "/helloworld/d" "feeds.conf.default" && git clone -q --depth=1 --branch=master --single-branch https://github.com/qqhpc/helloworld.git ./package/luci-app-ssr-plus
 
 # passwall-depends
 git clone -q --depth=1 --branch=main --single-branch https://github.com/qqhpc/openwrt-passwall-packages.git ./package/passwall-depends
@@ -18,7 +18,7 @@ git clone -q --depth=1 --branch=main --single-branch https://github.com/qqhpc/op
 git clone -q --depth=1 --branch=master --single-branch https://github.com/qqhpc/OpenClash.git ./package/luci-app-openclash
 
 # luci-app-homeproxy
-git clone -q --depth=1 --branch=master --single-branch https://github.com/qqhpc/homeproxy.git ./package/luci-app-homeproxy
+# git clone -q --depth=1 --branch=master --single-branch https://github.com/qqhpc/homeproxy.git ./package/luci-app-homeproxy
 
 # 更新 go
 
