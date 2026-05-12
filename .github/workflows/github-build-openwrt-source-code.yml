@@ -175,18 +175,6 @@ jobs:
             ${{ runner.os }}-dl-${{ inputs.source }}-
 
 
-      - name: Cache OpenWrt ccache
-        uses: actions/cache@v5
-        with:
-          path: ${{ env.WORKDIR }}/openwrt/.ccache
-          # 末尾带 run_id 确保每次都能存入新缓存
-          key: ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.device }}-${{ inputs.version_number }}-${{ inputs.purpose }}-${{ github.run_id }}
-          restore-keys: |
-            ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.device }}-${{ inputs.version_number }}-${{ inputs.purpose }}-
-            ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.device }}-${{ inputs.version_number }}-
-
-
-
       - name: Update and install feeds
         run: |
           cd openwrt
@@ -232,7 +220,7 @@ jobs:
           cd openwrt
           make defconfig
           # 删除旧的 Go 依赖缓存，强制重新拉取
-          rm -rf dl/go-mod-cache/
+          rm -rf dl/go-mod-cache || true
           make download -j4
           find dl -size -1024c -exec ls -l {} \;
           find dl -size -1024c -exec rm -f {} \;
@@ -243,16 +231,8 @@ jobs:
         run: |
           echo "编译前剩余空间为:" && df -h
           cd openwrt
-
-          # 设置 ccache 目录变量,限制缓存大小为 2G (防止挤爆 GitHub 10G 限制)
-          export CCACHE_DIR=$PWD/.ccache
-          ccache -M 2G 2>/dev/null || true
           
           make -j$(nproc) || (make -j1) || (make clean && make -j1 V=s)
-
-          # 打印本次编译的 ccache 命中统计信息
-          echo "--------- ccache 命中统计 ---------"
-          ccache -s 2>/dev/null || ./staging_dir/host/bin/ccache -s 2>/dev/null || true
           
           grep '^CONFIG_device.*DEVICE.*=y' .config | sed -r 's/.*DEVICE_(.*)=y/\1/' > DEVICE_NAME
           [ -s DEVICE_NAME ] && echo "DEVICE_NAME=_$(cat DEVICE_NAME)" >> $GITHUB_ENV
@@ -299,12 +279,3 @@ jobs:
           body_path: release_notes.txt
           files: ${{ env.FIRMWARE }}/*
           token: ${{ secrets.GITHUB_TOKEN }}
-
-          
-      # 若编译失败,仍然保留 ccache 内容(加快排错后的下次编译)
-      - name: Save OpenWrt ccache on failure
-        uses: actions/cache/save@v5
-        if: failure()
-        with:
-          path: ${{ env.WORKDIR }}/openwrt/.ccache
-          key: ${{ runner.os }}-ccache-${{ inputs.source }}-${{ inputs.device }}-${{ inputs.version_number }}-${{ inputs.purpose }}-${{ github.run_id }}
